@@ -19,7 +19,7 @@ def movenet(input_image):
 
   Returns:
     A [1, 1, 17, 3] float numpy array representing the predicted keypoint
-    coordinates and scores.
+      coordinates and scores.
   """
   model = module.signatures['serving_default']
 

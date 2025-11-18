@@ -5,10 +5,20 @@ import tensorflow as tf
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 import os
+import pyttsx3
+import threading
 
 # --- Import from your other files ---
 from model import movenet, input_size
 from visualization import draw_prediction_on_image
+
+# Initialize TTS engine
+engine = pyttsx3.init()
+prev_feedback = None
+
+def speak(text):
+    engine.say(text)
+    engine.runAndWait()
 
 # --- Helper Functions (from previous script) ---
 def get_keypoints(image):
@@ -106,7 +116,7 @@ if not reference_poses:
     exit()
 
 # --- SETUP WEBCAM ---
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 if not cap.isOpened():
     print("Error: Cannot open webcam.")
     exit()
@@ -152,6 +162,11 @@ while True:
     else:
         feedback_text = "POSE: NO MATCH"
         color = (0, 0, 255) # Red
+
+    # Audio feedback if pose changed
+    if feedback_text != prev_feedback:
+        threading.Thread(target=speak, args=(feedback_text,)).start()
+        prev_feedback = feedback_text
 
     # Put the text on the image
     cv2.putText(

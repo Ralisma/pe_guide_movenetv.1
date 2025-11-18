@@ -14,82 +14,9 @@ import matplotlib.patches as patches
 import imageio
 from IPython.display import HTML, display
 
-model_name = "movenet_lightning_f16.tflite"
+# --- REDUNDANT MODEL LOADING CODE HAS BEEN REMOVED ---
+# (The model is correctly loaded in model.py)
 
-if "tflite" in model_name:
-  if "movenet_lightning_f16" in model_name:
-    urllib.request.urlretrieve('https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/tflite/float16/4?lite-format=tflite', 'model.tflite')
-    input_size = 192
-  elif "movenet_thunder_f16" in model_name:
-    urllib.request.urlretrieve('https://tfhub.dev/google/lite-model/movenet/singlepose/thunder/tflite/float16/4?lite-format=tflite', 'model.tflite')
-    input_size = 256
-  elif "movenet_lightning_int8" in model_name:
-    urllib.request.urlretrieve('https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/tflite/int8/4?lite-format=tflite', 'model.tflite')
-    input_size = 192
-  elif "movenet_thunder_int8" in model_name:
-    urllib.request.urlretrieve('https://tfhub.dev/google/lite-model/movenet/singlepose/thunder/tflite/int8/4?lite-format=tflite', 'model.tflite')
-    input_size = 256
-  else:
-    raise ValueError("Unsupported model name: %s" % model_name)
-
-  # Initialize the TFLite interpreter
-  interpreter = tf.lite.Interpreter(model_path="model.tflite")
-  interpreter.allocate_tensors()
-
-  def movenet(input_image):
-    """Runs detection on an input image.
-
-    Args:
-      input_image: A [1, height, width, 3] tensor represents the input image
-        pixels. Note that the height/width should already be resized and match the
-        expected input resolution of the model before passing into this function.
-
-    Returns:
-      A [1, 1, 17, 3] float numpy array representing the predicted keypoint
-      coordinates and scores.
-    """
-    # TF Lite format expects tensor type of uint8.
-    input_image = tf.cast(input_image, dtype=tf.uint8)
-    input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
-    interpreter.set_tensor(input_details[0]['index'], input_image.numpy())
-    # Invoke inference.
-    interpreter.invoke()
-    # Get the model prediction.
-    keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
-    return keypoints_with_scores
-
-else:
-  if "movenet_lightning" in model_name:
-    module = hub.load("https://tfhub.dev/google/movenet/singlepose/lightning/4")
-    input_size = 192
-  elif "movenet_thunder" in model_name:
-    module = hub.load("https://tfhub.dev/google/movenet/singlepose/thunder/4")
-    input_size = 256
-  else:
-    raise ValueError("Unsupported model name: %s" % model_name)
-
-  def movenet(input_image):
-    """Runs detection on an input image.
-
-    Args:
-      input_image: A [1, height, width, 3] tensor represents the input image
-        pixels. Note that the height/width should already be resized and match the
-        expected input resolution of the model before passing into this function.
-
-    Returns:
-      A [1, 1, 17, 3] float numpy array representing the predicted keypoint
-      coordinates and scores.
-    """
-    model = module.signatures['serving_default']
-
-    # SavedModel format expects tensor type of int32.
-    input_image = tf.cast(input_image, dtype=tf.int32)
-    # Run model inference.
-    outputs = model(input_image)
-    # Output is a [1, 1, 17, 3] tensor.
-    keypoints_with_scores = outputs['output_0'].numpy()
-    return keypoints_with_scores
 
 # Dictionary that maps from joint names to keypoint indices.
 KEYPOINT_DICT = {
@@ -161,21 +88,24 @@ def _keypoints_and_edges_for_display(keypoints_with_scores,
   # Convert keypoints to pixel coordinates
   keypoints_xy = keypoints_xy * np.array([width, height])
 
-  # Filter keypoints based on confidence threshold
-  display_keypoints = keypoints_scores > keypoint_threshold
-  keypoints_xy = keypoints_xy[display_keypoints, :]
+  # --- FIX 1: Create a new variable for the filtered scatter plot points ---
+  # We keep the original `keypoints_xy` (with 17 points) for edge drawing.
+  display_keypoints_mask = keypoints_scores > keypoint_threshold
+  keypoints_for_scat = keypoints_xy[display_keypoints_mask, :]
 
   # Get edges
   edges_xy = []
   edge_colors = []
   for edge, color in KEYPOINT_EDGE_INDS_TO_COLOR.items():
+    # --- FIX 2: Check scores but use simple indexing on the full array ---
     if (keypoints_scores[edge[0]] > keypoint_threshold and
         keypoints_scores[edge[1]] > keypoint_threshold):
-      edges_xy.append((keypoints_xy[edge[0] - display_keypoints[:edge[0]].sum()],
-                       keypoints_xy[edge[1] - display_keypoints[:edge[1]].sum()]))
+      # Use simple, direct indexing on the full 17-point array
+      edges_xy.append((keypoints_xy[edge[0]], keypoints_xy[edge[1]]))
       edge_colors.append(color)
 
-  return keypoints_xy, edges_xy, edge_colors
+  # --- FIX 3: Return the filtered points for the scatter plot ---
+  return keypoints_for_scat, edges_xy, edge_colors
 
 def draw_prediction_on_image(
     image, keypoints_with_scores, crop_region=None, close_figure=False,
@@ -214,6 +144,7 @@ def draw_prediction_on_image(
   # Turn off tick labels
   scat = ax.scatter([], [], s=60, color='#FF1493', zorder=3)
 
+  # Note: keypoint_locs now refers to the filtered points (keypoints_for_scat)
   (keypoint_locs, keypoint_edges,
    edge_colors) = _keypoints_and_edges_for_display(
        keypoints_with_scores, height, width)
@@ -224,7 +155,7 @@ def draw_prediction_on_image(
     line_segments.set_segments(keypoint_edges)
     line_segments.set_color(edge_colors)
   
-  # This 'if' statement is now correctly indented
+  # This 'if' statement is correctly indented
   if keypoint_locs.size > 0:
     scat.set_offsets(keypoint_locs)
 

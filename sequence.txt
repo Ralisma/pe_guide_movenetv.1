@@ -1,0 +1,10 @@
+# Add Poses
+start
+armraise
+sidehipflexor
+standingquadstretch
+warrior
+lunge
+standinglegraise
+start
+
