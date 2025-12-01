@@ -1,10 +1,18 @@
 # Add Poses
 start
-armraise
-sidehipflexor
-standingquadstretch
-warrior
-lunge
-standinglegraise
+arm_raise
+leg_raise_left
+leg_raise_right
+lunge_left
+lunge_right
+side_stretch_left
+side_stretch_right
+sit_on_the_air_left
+sit_on_the_air_right
+table_left
+table_right
+toe_touch_hang_left
+toe_touch_hang_right
+warrior_left
+warrior_right
 start
-
